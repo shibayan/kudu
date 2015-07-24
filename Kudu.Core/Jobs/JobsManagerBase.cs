@@ -25,7 +25,8 @@ namespace Kudu.Core.Jobs
             new BashScriptHost(),
             new PythonScriptHost(),
             new PhpScriptHost(),
-            new NodeScriptHost()
+            new NodeScriptHost(),
+            new FSharpScriptHost()
         };
 
         public static bool IsUsingSdk(string specificJobDataPath)
