@@ -253,6 +253,12 @@ namespace Kudu.Services.Jobs
             return SetJobSettings(jobName, jobSettings, _triggeredJobsManager);
         }
 
+        [AcceptVerbs("GET", "HEAD", "PUT", "POST", "DELETE", "PATCH")]
+        public Task<HttpResponseMessage> RequestPassthrough(string jobName)
+        {
+            return _continuousJobsManager.RequestPassthrough(jobName, Request);
+        }
+
         private HttpResponseMessage ListJobsResponseBasedOnETag(IEnumerable<JobBase> jobs)
         {
             string etag = GetRequestETag();

@@ -73,7 +73,7 @@ namespace Kudu.Core.Jobs
                     try
                     {
                         InitializeJobInstance(triggeredJob, logger);
-                        RunJobInstance(triggeredJob, logger, logger.Id, trigger);
+                        RunJobInstance(triggeredJob, logger, logger.Id, trigger, port: -1);
                     }
                     catch (Exception ex)
                     {

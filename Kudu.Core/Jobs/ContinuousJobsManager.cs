@@ -2,17 +2,21 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using Kudu.Contracts.Jobs;
 using Kudu.Contracts.Settings;
 using Kudu.Core.Infrastructure;
 using Kudu.Core.Tracing;
+using System.Net;
+using System.Threading.Tasks;
 
 namespace Kudu.Core.Jobs
 {
     public class ContinuousJobsManager : JobsManagerBase<ContinuousJob>, IContinuousJobsManager, IDisposable
     {
         private const string StatusFilesSearchPattern = ContinuousJobStatus.FileNamePrefix + "*";
+        private const string Localhost = "127.0.0.1";
 
         private readonly Dictionary<string, ContinuousJobRunner> _continuousJobRunners = new Dictionary<string, ContinuousJobRunner>(StringComparer.OrdinalIgnoreCase);
 
@@ -55,6 +59,57 @@ namespace Kudu.Core.Jobs
             }
 
             continuousJobRunner.EnableJob();
+        }
+
+        public async Task<HttpResponseMessage> RequestPassthrough(string jobName, HttpRequestMessage request)
+        {
+            try
+            {
+                using (var client = new HttpClient())
+                {
+                    var forwardRequest = GetWebJobForwardRequest(jobName, request);
+                    return await client.SendAsync(forwardRequest);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                var response = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+                response.Content = new StreamContent(GenerateStreamFromString(e.ToString()));
+                return response;
+            }
+        }
+
+        public static Stream GenerateStreamFromString(string s)
+        {
+            MemoryStream stream = new MemoryStream();
+            StreamWriter writer = new StreamWriter(stream);
+            writer.Write(s);
+            writer.Flush();
+            stream.Position = 0;
+            return stream;
+        }
+
+        private HttpRequestMessage GetWebJobForwardRequest(string jobName, HttpRequestMessage original)
+        {
+            var jobRunner = GetJobRunner(jobName);
+            var clone = new HttpRequestMessage(original.Method, new Uri(string.Concat("http://", Localhost, ":", jobRunner.WebJobPort)));
+
+            if (original.Method != HttpMethod.Get)
+            {
+                clone.Content = original.Content;
+            }
+
+            original.Headers.Aggregate(clone.Headers, (a, b) =>
+            {
+                if (!b.Key.Equals("HOST", StringComparison.OrdinalIgnoreCase))
+                {
+                    a.Add(b.Key, b.Value);
+                }
+                return a;
+            });
+
+            return clone;
         }
 
         private ContinuousJobRunner GetJobRunner(string jobName)
